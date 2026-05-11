@@ -37,7 +37,7 @@ public class StartScreen extends JFrame {
         ipLabel.setForeground(Color.WHITE);
         ipLabel.setFont(new Font("Arial", Font.BOLD, 18));
 
-        JTextField ipField = new JTextField("localhost");
+        JTextField ipField = new JTextField("98.82.187.117");
         ipField.setHorizontalAlignment(SwingConstants.CENTER);
         ipField.setFont(new Font("Arial", Font.PLAIN, 18));
 
