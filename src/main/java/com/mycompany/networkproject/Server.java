@@ -9,12 +9,16 @@ public class Server {
     public static void main(String[] args) {
         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
             System.out.println("Server started on port " + PORT + "...");
+
             while (true) {
                 System.out.println("Waiting for players...");
+
                 Socket player1 = serverSocket.accept();
                 System.out.println("White connected: " + player1.getRemoteSocketAddress());
+
                 Socket player2 = serverSocket.accept();
                 System.out.println("Black connected: " + player2.getRemoteSocketAddress());
+
                 Thread session = new Thread(new GameSession(player1, player2), "game-session");
                 session.start();
             }
@@ -40,12 +44,15 @@ public class Server {
             try {
                 white.send("ROLE|WHITE");
                 black.send("ROLE|BLACK");
+
                 broadcastState();
 
                 Thread t1 = new Thread(() -> listen(white), "white-listener");
                 Thread t2 = new Thread(() -> listen(black), "black-listener");
+
                 t1.start();
                 t2.start();
+
                 t1.join();
                 t2.join();
             } catch (Exception e) {
@@ -76,51 +83,54 @@ public class Server {
         private synchronized void handleMessage(PlayerConnection player, String message) {
             try {
                 String[] parts = message.split("\\|");
+
                 switch (parts[0]) {
                     case "MOVE" -> {
                         Move move = Move.fromProtocol(parts);
                         MoveResult result = game.playMove(move, player.color);
+
                         if (!result.success) {
                             player.send("ERROR|" + GameState.escape(result.message));
                             return;
                         }
+
                         broadcastState();
                     }
+
                     case "RESIGN" -> {
                         game.resign(player.color);
                         broadcastState();
                         finishSession();
                     }
+
                     case "DRAW_OFFER" -> {
-                        String result = game.offerDraw(player.color);
-                        if ("Game is already over".equals(result)) {
-                            player.send("ERROR|" + GameState.escape(result));
-                            return;
-                        }
+                        game.offerDraw(player.color);
                         broadcastState();
                     }
+
                     case "DRAW_ACCEPT" -> {
-                        String result = game.respondDraw(player.color, true);
-                        if ("There is no active draw offer.".equals(result) || "You cannot answer your own draw offer.".equals(result)) {
-                            player.send("ERROR|" + GameState.escape(result));
-                            return;
-                        }
+                        game.respondDraw(player.color, true);
                         broadcastState();
-                        if (game.isGameOver()) finishSession();
+
+                        if (game.isGameOver()) {
+                            finishSession();
+                        }
                     }
+
                     case "DRAW_DECLINE" -> {
-                        String result = game.respondDraw(player.color, false);
-                        if ("There is no active draw offer.".equals(result) || "You cannot answer your own draw offer.".equals(result)) {
-                            player.send("ERROR|" + GameState.escape(result));
-                            return;
-                        }
+                        game.respondDraw(player.color, false);
                         broadcastState();
                     }
+
                     default -> player.send("ERROR|Unknown command: " + GameState.escape(parts[0]));
                 }
-                if (game.isGameOver()) finishSession();
+
+                if (game.isGameOver()) {
+                    finishSession();
+                }
             } catch (Exception e) {
                 player.send("ERROR|Invalid message: " + GameState.escape(e.getMessage()));
+
                 System.err.println("Invalid client message from " + player.color + ": " + message);
                 e.printStackTrace();
             }
@@ -128,7 +138,9 @@ public class Server {
 
         private synchronized void handleDisconnect(PlayerConnection disconnected) {
             if (!running && game.isGameOver()) return;
+
             System.out.println(disconnected.color + " disconnected.");
+
             game.opponentDisconnected(disconnected.color);
             broadcastState();
             finishSession();
@@ -147,7 +159,10 @@ public class Server {
         }
 
         private void closeQuietly(PlayerConnection p) {
-            try { p.socket.close(); } catch (Exception ignored) { }
+            try {
+                p.socket.close();
+            } catch (Exception ignored) {
+            }
         }
     }
 

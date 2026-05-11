@@ -33,21 +33,28 @@ public class Move {
         if (parts.length < 5 || !"MOVE".equals(parts[0])) {
             throw new IllegalArgumentException("Invalid MOVE message format");
         }
+
         int sx = Integer.parseInt(parts[1]);
         int sy = Integer.parseInt(parts[2]);
         int dx = Integer.parseInt(parts[3]);
         int dy = Integer.parseInt(parts[4]);
+
         PieceType promotion = null;
+
         if (parts.length >= 6 && !parts[5].isBlank()) {
             promotion = PieceType.valueOf(parts[5]);
+
             if (promotion == PieceType.KING || promotion == PieceType.PAWN) {
                 throw new IllegalArgumentException("Invalid promotion piece");
             }
         }
-        // Do not reject out-of-board coordinates here.
-        // Let GameState.playMove(...) validate them and return
-        // MoveResult.fail("Move is outside board bounds") so the client receives
-        // the same ERROR|... protocol used for other rejected moves.
-        return new Move(sx, sy, dx, dy, promotion);
+
+        Move move = new Move(sx, sy, dx, dy, promotion);
+
+        if (!move.isInsideBoard()) {
+            throw new IllegalArgumentException("Move is outside board bounds");
+        }
+
+        return move;
     }
 }
