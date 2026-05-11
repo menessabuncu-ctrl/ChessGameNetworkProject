@@ -32,7 +32,9 @@ public class Server {
         private final PlayerConnection white;
         private final PlayerConnection black;
         private final GameState game = new GameState();
+
         private volatile boolean running = true;
+        private PieceColor replayRequestedBy = null;
 
         GameSession(Socket whiteSocket, Socket blackSocket) throws IOException {
             white = new PlayerConnection(whiteSocket, PieceColor.WHITE);
@@ -86,6 +88,11 @@ public class Server {
 
                 switch (parts[0]) {
                     case "MOVE" -> {
+                        if (game.isGameOver()) {
+                            player.send("ERROR|Game is over. Use Replay or Back to Menu.");
+                            return;
+                        }
+
                         Move move = Move.fromProtocol(parts);
                         MoveResult result = game.playMove(move, player.color);
 
@@ -94,40 +101,61 @@ public class Server {
                             return;
                         }
 
+                        replayRequestedBy = null;
                         broadcastState();
                     }
 
                     case "RESIGN" -> {
+                        if (game.isGameOver()) {
+                            player.send("ERROR|Game is already over");
+                            return;
+                        }
+
                         game.resign(player.color);
+                        replayRequestedBy = null;
                         broadcastState();
-                        finishSession();
                     }
 
                     case "DRAW_OFFER" -> {
+                        if (game.isGameOver()) {
+                            player.send("ERROR|Game is already over");
+                            return;
+                        }
+
                         game.offerDraw(player.color);
                         broadcastState();
                     }
 
                     case "DRAW_ACCEPT" -> {
-                        game.respondDraw(player.color, true);
-                        broadcastState();
-
                         if (game.isGameOver()) {
-                            finishSession();
+                            player.send("ERROR|Game is already over");
+                            return;
                         }
+
+                        game.respondDraw(player.color, true);
+                        replayRequestedBy = null;
+                        broadcastState();
                     }
 
                     case "DRAW_DECLINE" -> {
+                        if (game.isGameOver()) {
+                            player.send("ERROR|Game is already over");
+                            return;
+                        }
+
                         game.respondDraw(player.color, false);
                         broadcastState();
                     }
 
+                    case "REPLAY_REQUEST" -> handleReplayRequest(player);
+
+                    case "REPLAY_ACCEPT" -> handleReplayAccept(player);
+
+                    case "REPLAY_DECLINE" -> handleReplayDecline(player);
+
                     default -> player.send("ERROR|Unknown command: " + GameState.escape(parts[0]));
                 }
 
-                if (game.isGameOver()) {
-                    finishSession();
-                }
             } catch (Exception e) {
                 player.send("ERROR|Invalid message: " + GameState.escape(e.getMessage()));
 
@@ -136,14 +164,88 @@ public class Server {
             }
         }
 
+        private void handleReplayRequest(PlayerConnection player) {
+            if (!game.isGameOver()) {
+                player.send("ERROR|Replay can only be requested after the game is over");
+                return;
+            }
+
+            if (replayRequestedBy == null) {
+                replayRequestedBy = player.color;
+                player.send("REPLAY_WAITING");
+                opponentOf(player).send("REPLAY_OFFER|" + player.color);
+                return;
+            }
+
+            if (replayRequestedBy == player.color) {
+                player.send("REPLAY_WAITING");
+                return;
+            }
+
+            startReplay();
+        }
+
+        private void handleReplayAccept(PlayerConnection player) {
+            if (!game.isGameOver()) {
+                player.send("ERROR|Replay can only be accepted after the game is over");
+                return;
+            }
+
+            if (replayRequestedBy == null) {
+                replayRequestedBy = player.color;
+                player.send("REPLAY_WAITING");
+                opponentOf(player).send("REPLAY_OFFER|" + player.color);
+                return;
+            }
+
+            if (replayRequestedBy == player.color) {
+                player.send("REPLAY_WAITING");
+                return;
+            }
+
+            startReplay();
+        }
+
+        private void handleReplayDecline(PlayerConnection player) {
+            if (replayRequestedBy != null && replayRequestedBy != player.color) {
+                player.send("REPLAY_DECLINED");
+                opponentOf(player).send("REPLAY_DECLINED");
+                replayRequestedBy = null;
+            }
+        }
+
+        private void startReplay() {
+            replayRequestedBy = null;
+
+            game.reset();
+
+            white.send("REPLAY_START");
+            black.send("REPLAY_START");
+
+            broadcastState();
+        }
+
         private synchronized void handleDisconnect(PlayerConnection disconnected) {
-            if (!running && game.isGameOver()) return;
+            if (!running) {
+                return;
+            }
 
             System.out.println(disconnected.color + " disconnected.");
 
-            game.opponentDisconnected(disconnected.color);
-            broadcastState();
+            PlayerConnection opponent = opponentOf(disconnected);
+
+            if (game.isGameOver()) {
+                opponent.send("REPLAY_UNAVAILABLE|Opponent left the session. You can go back to menu and find a new opponent.");
+            } else {
+                game.opponentDisconnected(disconnected.color);
+                broadcastState();
+            }
+
             finishSession();
+        }
+
+        private PlayerConnection opponentOf(PlayerConnection player) {
+            return player == white ? black : white;
         }
 
         private synchronized void finishSession() {

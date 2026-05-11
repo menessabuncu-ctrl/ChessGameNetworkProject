@@ -14,7 +14,9 @@ public class GameFrame extends JFrame {
     private final JButton offerDrawButton = new JButton("Offer Draw");
     private final JButton acceptDrawButton = new JButton("Accept Draw");
     private final JButton declineDrawButton = new JButton("Decline Draw");
+
     private boolean endScreenShown = false;
+    private EndScreen endScreen;
 
     public GameFrame(Client client, PieceColor role) {
         this.client = client;
@@ -99,6 +101,10 @@ public class GameFrame extends JFrame {
         board.setState(boardState, turn, status, message);
         updateActionButtons(status);
 
+        if (!isGameOver(status) && endScreenShown) {
+            closeEndScreenForReplay();
+        }
+
         if (isGameOver(status) && !endScreenShown) {
             endScreenShown = true;
 
@@ -106,7 +112,7 @@ public class GameFrame extends JFrame {
                     ? message
                     : message + " Winner: " + winner;
 
-            new EndScreen(result, client, this);
+            endScreen = new EndScreen(result, client, this);
         }
     }
 
@@ -125,6 +131,75 @@ public class GameFrame extends JFrame {
         offerDrawButton.setEnabled(active);
         acceptDrawButton.setEnabled(active);
         declineDrawButton.setEnabled(active);
+    }
+
+    public void receiveReplayOffer(String requester) {
+        if (endScreen != null) {
+            endScreen.setReplayOfferReceived();
+        }
+
+        int answer = JOptionPane.showConfirmDialog(
+                this,
+                requester + " wants to play again. Start a new game with the same opponent?",
+                "Replay Request",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (answer == JOptionPane.YES_OPTION) {
+            client.acceptReplay();
+        } else {
+            client.declineReplay();
+        }
+    }
+
+    public void showReplayWaiting() {
+        if (endScreen != null) {
+            endScreen.setReplayWaiting();
+        }
+
+        statusLabel.setText("Replay request sent. Waiting for opponent...");
+    }
+
+    public void showReplayDeclined() {
+        if (endScreen != null) {
+            endScreen.setReplayDeclined();
+        }
+
+        JOptionPane.showMessageDialog(
+                this,
+                "Opponent declined the replay request.",
+                "Replay",
+                JOptionPane.INFORMATION_MESSAGE
+        );
+    }
+
+    public void showReplayUnavailable(String message) {
+        if (endScreen != null) {
+            endScreen.setReplayUnavailable();
+        }
+
+        JOptionPane.showMessageDialog(
+                this,
+                message,
+                "Replay Unavailable",
+                JOptionPane.WARNING_MESSAGE
+        );
+    }
+
+    public void startReplayFromServer() {
+        closeEndScreenForReplay();
+        statusLabel.setText("Replay started. New game is loading...");
+        setVisible(true);
+        toFront();
+    }
+
+    private void closeEndScreenForReplay() {
+        if (endScreen != null) {
+            endScreen.closeForReplay();
+            endScreen = null;
+        }
+
+        endScreenShown = false;
     }
 
     public void showConnectionError(String message) {
