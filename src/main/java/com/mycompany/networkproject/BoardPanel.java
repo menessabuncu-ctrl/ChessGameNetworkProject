@@ -24,6 +24,7 @@ public class BoardPanel extends JPanel {
 
     private void createBoard() {
         boolean whiteBottom = role == PieceColor.WHITE;
+
         for (int row = 0; row < 8; row++) {
             for (int col = 0; col < 8; col++) {
                 int boardX = whiteBottom ? col : 7 - col;
@@ -39,6 +40,7 @@ public class BoardPanel extends JPanel {
 
                 int finalX = boardX;
                 int finalY = boardY;
+
                 button.addActionListener(e -> handleClick(finalX, finalY));
 
                 add(button);
@@ -58,6 +60,7 @@ public class BoardPanel extends JPanel {
 
     public void setInteractionEnabled(boolean enabled) {
         this.interactionEnabled = enabled;
+
         for (JButton[] row : buttons) {
             for (JButton b : row) {
                 b.setEnabled(enabled);
@@ -152,6 +155,7 @@ public class BoardPanel extends JPanel {
         button.setBorder(BorderFactory.createLineBorder(new Color(70, 70, 70), 1));
 
         Piece piece = board[y][x];
+
         button.setText(piece == null ? "" : getPieceSymbol(piece));
         button.setEnabled(interactionEnabled);
     }

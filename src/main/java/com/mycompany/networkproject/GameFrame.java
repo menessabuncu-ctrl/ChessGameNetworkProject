@@ -19,16 +19,19 @@ public class GameFrame extends JFrame {
     public GameFrame(Client client, PieceColor role) {
         this.client = client;
         this.role = role;
+
         setTitle("Chess - " + role);
         setSize(760, 700);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent e) {
                 client.exitApplication();
             }
         });
+
         setLayout(new BorderLayout(8, 8));
 
         statusLabel.setFont(new Font("Arial", Font.BOLD, 18));
@@ -39,16 +42,27 @@ public class GameFrame extends JFrame {
         add(board, BorderLayout.CENTER);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 8));
+
         actions.add(resignButton);
         actions.add(offerDrawButton);
         actions.add(acceptDrawButton);
         actions.add(declineDrawButton);
+
         add(actions, BorderLayout.SOUTH);
 
         resignButton.addActionListener(e -> {
-            int ok = JOptionPane.showConfirmDialog(this, "Resign the game?", "Confirm", JOptionPane.YES_NO_OPTION);
-            if (ok == JOptionPane.YES_OPTION) client.resign();
+            int ok = JOptionPane.showConfirmDialog(
+                    this,
+                    "Resign the game?",
+                    "Confirm",
+                    JOptionPane.YES_NO_OPTION
+            );
+
+            if (ok == JOptionPane.YES_OPTION) {
+                client.resign();
+            }
         });
+
         offerDrawButton.addActionListener(e -> client.offerDraw());
         acceptDrawButton.addActionListener(e -> client.acceptDraw());
         declineDrawButton.addActionListener(e -> client.declineDraw());
@@ -58,34 +72,55 @@ public class GameFrame extends JFrame {
 
     public void receiveState(String stateMessage) {
         String[] p = stateMessage.split("\\|", 8);
-        if (p.length < 8) throw new IllegalArgumentException("Incomplete STATE message");
+
+        if (p.length < 8) {
+            throw new IllegalArgumentException("Incomplete STATE message");
+        }
+
         PieceColor turn = PieceColor.valueOf(p[1]);
         GameStatus status = GameStatus.valueOf(p[2]);
         String winner = p[3];
         String message = p[4];
         String boardEncoded = p[7];
+
         Piece[][] boardState = GameState.deserializeBoard(boardEncoded);
 
         boolean myTurn = status == GameStatus.ACTIVE || status == GameStatus.CHECK;
         myTurn = myTurn && turn == role;
-        statusLabel.setText("You are " + role + " | " + (myTurn ? "Your turn" : "Opponent's turn") + " | " + message);
+
+        statusLabel.setText(
+                "You are " + role
+                        + " | "
+                        + (myTurn ? "Your turn" : "Opponent's turn")
+                        + " | "
+                        + message
+        );
+
         board.setState(boardState, turn, status, message);
         updateActionButtons(status);
 
         if (isGameOver(status) && !endScreenShown) {
             endScreenShown = true;
-            String result = winner.equals("NONE") ? message : message + " Winner: " + winner;
+
+            String result = winner.equals("NONE")
+                    ? message
+                    : message + " Winner: " + winner;
+
             new EndScreen(result, client, this);
         }
     }
 
     private boolean isGameOver(GameStatus status) {
-        return status == GameStatus.CHECKMATE || status == GameStatus.STALEMATE || status == GameStatus.DRAW
-                || status == GameStatus.RESIGNED || status == GameStatus.DISCONNECTED;
+        return status == GameStatus.CHECKMATE
+                || status == GameStatus.STALEMATE
+                || status == GameStatus.DRAW
+                || status == GameStatus.RESIGNED
+                || status == GameStatus.DISCONNECTED;
     }
 
     private void updateActionButtons(GameStatus status) {
         boolean active = !isGameOver(status);
+
         resignButton.setEnabled(active);
         offerDrawButton.setEnabled(active);
         acceptDrawButton.setEnabled(active);
@@ -96,12 +131,24 @@ public class GameFrame extends JFrame {
         statusLabel.setText(message);
         board.setInteractionEnabled(false);
         updateActionButtons(GameStatus.DISCONNECTED);
-        JOptionPane.showMessageDialog(this, message, "Connection", JOptionPane.ERROR_MESSAGE);
+
+        JOptionPane.showMessageDialog(
+                this,
+                message,
+                "Connection",
+                JOptionPane.ERROR_MESSAGE
+        );
     }
 
-    public boolean isEndScreenShown() { return endScreenShown; }
+    public boolean isEndScreenShown() {
+        return endScreenShown;
+    }
 
-    public void closeFrame() { dispose(); }
+    public void closeFrame() {
+        dispose();
+    }
 
-    public void exitApplication() { client.exitApplication(); }
+    public void exitApplication() {
+        client.exitApplication();
+    }
 }

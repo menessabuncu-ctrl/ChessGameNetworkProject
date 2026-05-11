@@ -154,6 +154,7 @@ public class Server {
 
         private void broadcastState() {
             String state = game.toStateMessage();
+
             white.send(state);
             black.send(state);
         }
